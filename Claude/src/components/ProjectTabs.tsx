@@ -4,6 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SceneJson } from "@/lib/scene/schema";
 
+type ReferenceItem = {
+  id: string;
+  kind: string;
+  label: string | null;
+  url: string;
+  characterId: string | null;
+  environmentId: string | null;
+  propId: string | null;
+  clothingItemId: string | null;
+};
+
 type ProjectDetail = {
   id: string;
   prompt: string;
@@ -13,9 +24,23 @@ type ProjectDetail = {
     props: { id: string; name: string }[];
     clothingItems: { id: string; name: string }[];
   } | null;
+  references: ReferenceItem[];
   story: { rawInput: string; refinedText: string | null; finalizedAt: string | Date | null } | null;
   scenes: { id: string; index: number; sceneJson: unknown }[];
 };
+
+const REFERENCE_KINDS = [
+  "CHARACTER_SHEET",
+  "CHARACTER_IMAGE",
+  "CLOTHING",
+  "ENVIRONMENT",
+  "ART_DIRECTION",
+  "GAME_SCREENSHOT",
+  "PROP",
+  "CAMERA_COMPOSITION",
+  "PREVIOUS_FRAME",
+  "OTHER",
+] as const;
 
 const TABS = ["Brief", "Visual Bible", "Story", "Scenes", "Timeline", "Captions", "Music"] as const;
 
@@ -41,11 +66,37 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
       {tab === "Brief" && <div className="text-sm text-neutral-300 whitespace-pre-wrap">{project.prompt}</div>}
 
       {tab === "Visual Bible" && (
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <BibleSection title="Characters" items={project.visualBible?.characters ?? []} />
-          <BibleSection title="Environments" items={project.visualBible?.environments ?? []} />
-          <BibleSection title="Props" items={project.visualBible?.props ?? []} />
-          <BibleSection title="Clothing" items={project.visualBible?.clothingItems ?? []} />
+        <div className="flex flex-col gap-4">
+          <ReferenceUploader projectId={project.id} visualBible={project.visualBible} />
+
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <BibleSection
+              title="Characters"
+              items={project.visualBible?.characters ?? []}
+              references={project.references}
+              entityKey="characterId"
+            />
+            <BibleSection
+              title="Environments"
+              items={project.visualBible?.environments ?? []}
+              references={project.references}
+              entityKey="environmentId"
+            />
+            <BibleSection
+              title="Props"
+              items={project.visualBible?.props ?? []}
+              references={project.references}
+              entityKey="propId"
+            />
+            <BibleSection
+              title="Clothing"
+              items={project.visualBible?.clothingItems ?? []}
+              references={project.references}
+              entityKey="clothingItemId"
+            />
+          </div>
+
+          <GeneralReferences references={project.references} />
         </div>
       )}
 
@@ -60,20 +111,197 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
   );
 }
 
-function BibleSection({ title, items }: { title: string; items: { id: string; name: string }[] }) {
+function BibleSection({
+  title,
+  items,
+  references,
+  entityKey,
+}: {
+  title: string;
+  items: { id: string; name: string }[];
+  references: ReferenceItem[];
+  entityKey: "characterId" | "environmentId" | "propId" | "clothingItemId";
+}) {
+  const router = useRouter();
+
+  async function removeReference(referenceId: string) {
+    await fetch(`/api/references/${referenceId}`, { method: "DELETE" });
+    router.refresh();
+  }
+
   return (
     <div className="border border-neutral-800 rounded-lg p-3">
       <h3 className="text-neutral-300 font-medium mb-2">{title}</h3>
       {items.length === 0 ? (
         <p className="text-neutral-600 text-xs">None yet</p>
       ) : (
-        <ul className="text-neutral-400 text-xs flex flex-col gap-1">
-          {items.map((i) => (
-            <li key={i.id}>{i.name}</li>
-          ))}
+        <ul className="text-neutral-400 text-xs flex flex-col gap-3">
+          {items.map((item) => {
+            const refs = references.filter((r) => r[entityKey] === item.id);
+            return (
+              <li key={item.id} className="flex flex-col gap-1.5">
+                <span>{item.name}</span>
+                {refs.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {refs.map((r) => (
+                      <div key={r.id} className="relative group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={r.url} alt={r.label ?? ""} className="w-14 h-14 object-cover rounded border border-neutral-800" />
+                        <button
+                          onClick={() => removeReference(r.id)}
+                          className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[10px] leading-none"
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
+  );
+}
+
+function GeneralReferences({ references }: { references: ReferenceItem[] }) {
+  const router = useRouter();
+  const general = references.filter(
+    (r) => !r.characterId && !r.environmentId && !r.propId && !r.clothingItemId
+  );
+
+  async function removeReference(referenceId: string) {
+    await fetch(`/api/references/${referenceId}`, { method: "DELETE" });
+    router.refresh();
+  }
+
+  if (general.length === 0) return null;
+
+  return (
+    <div className="border border-neutral-800 rounded-lg p-3">
+      <h3 className="text-neutral-300 font-medium mb-2 text-sm">General references</h3>
+      <div className="flex flex-wrap gap-2">
+        {general.map((r) => (
+          <div key={r.id} className="relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={r.url} alt={r.label ?? ""} className="w-20 h-20 object-cover rounded border border-neutral-800" />
+            <button
+              onClick={() => removeReference(r.id)}
+              className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[10px] leading-none"
+              title="Remove"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReferenceUploader({
+  projectId,
+  visualBible,
+}: {
+  projectId: string;
+  visualBible: ProjectDetail["visualBible"];
+}) {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [kind, setKind] = useState<(typeof REFERENCE_KINDS)[number]>("CHARACTER_SHEET");
+  const [entity, setEntity] = useState("");
+  const [label, setLabel] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const entityOptions = [
+    ...(visualBible?.characters ?? []).map((c) => ({ type: "character", id: c.id, name: `Character: ${c.name}` })),
+    ...(visualBible?.environments ?? []).map((e) => ({ type: "environment", id: e.id, name: `Environment: ${e.name}` })),
+    ...(visualBible?.props ?? []).map((p) => ({ type: "prop", id: p.id, name: `Prop: ${p.name}` })),
+    ...(visualBible?.clothingItems ?? []).map((c) => ({ type: "clothingItem", id: c.id, name: `Clothing: ${c.name}` })),
+  ];
+
+  async function upload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const [entityType, entityId] = entity ? entity.split(":") : [undefined, undefined];
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", kind);
+      if (label) form.append("label", label);
+      if (entityType && entityId) {
+        form.append("entityType", entityType);
+        form.append("entityId", entityId);
+      }
+
+      const res = await fetch(`/api/projects/${projectId}/references`, { method: "POST", body: form });
+      if (!res.ok) throw new Error((await res.json())?.error || "Upload failed");
+      setFile(null);
+      setLabel("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={upload} className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-3">
+      <h3 className="text-sm font-medium text-neutral-300">Upload reference</h3>
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        className="text-xs text-neutral-400"
+      />
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as (typeof REFERENCE_KINDS)[number])}
+          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
+        >
+          {REFERENCE_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {k.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+        <select
+          value={entity}
+          onChange={(e) => setEntity(e.target.value)}
+          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
+        >
+          <option value="">General reference (not linked)</option>
+          {entityOptions.map((o) => (
+            <option key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Label (optional)"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs flex-1 min-w-32"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={!file || uploading}
+        className="self-start text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
+      >
+        {uploading ? "Uploading…" : "Upload"}
+      </button>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+    </form>
   );
 }
 
