@@ -13,12 +13,24 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
       visualBible: {
         include: { styleProfile: true, characters: true, environments: true, props: true, clothingItems: true },
       },
+      references: { include: { asset: true }, orderBy: { createdAt: "desc" } },
       story: true,
       scenes: { orderBy: { index: "asc" } },
     },
   });
 
   if (!project) notFound();
+
+  const references = project.references.map((r) => ({
+    id: r.id,
+    kind: r.kind,
+    label: r.label,
+    url: r.asset.url ?? `/api/storage/${encodeURIComponent(r.asset.storageKey)}`,
+    characterId: r.characterId,
+    environmentId: r.environmentId,
+    propId: r.propId,
+    clothingItemId: r.clothingItemId,
+  }));
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 flex flex-col gap-6">
@@ -29,7 +41,7 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
         </p>
       </div>
 
-      <ProjectTabs project={project} />
+      <ProjectTabs project={{ ...project, references }} />
     </div>
   );
 }
