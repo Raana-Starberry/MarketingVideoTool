@@ -2,6 +2,7 @@ import { listProviders } from "@/lib/providers/registry";
 import type { ProviderCategory } from "@/lib/providers/types";
 
 const CATEGORIES: { key: ProviderCategory; label: string }[] = [
+  { key: "llm", label: "LLM / Story Intelligence" },
   { key: "image", label: "Image Generation" },
   { key: "video", label: "Video Generation" },
   { key: "voice", label: "Voice" },

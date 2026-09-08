@@ -8,7 +8,8 @@ export type ProviderCategory =
   | "voice"
   | "music"
   | "lip-sync"
-  | "assets";
+  | "assets"
+  | "llm";
 
 /** A single reference image/clip handed to a provider for consistency. */
 export interface ProviderReference {
@@ -193,10 +194,37 @@ export interface AssetProvider extends ProviderMeta {
   fetch(externalId: string): Promise<GenerationResult>;
 }
 
+// ---------------------------------------------------------------------------
+// LLM (story refinement, entity extraction, scene breakdown)
+// ---------------------------------------------------------------------------
+
+export interface LLMCapabilities {
+  supportsJsonMode: boolean;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+}
+
+export interface LLMGenerationRequest {
+  prompt: string;
+  jsonMode?: boolean;
+  maxOutputTokens?: number;
+}
+
+export interface LLMResult {
+  text: string;
+}
+
+export interface LLMProvider extends ProviderMeta {
+  category: "llm";
+  getCapabilities(): LLMCapabilities;
+  generateText(req: LLMGenerationRequest): Promise<LLMResult>;
+}
+
 export type AnyProvider =
   | ImageProvider
   | VideoProvider
   | VoiceProvider
   | MusicProvider
   | LipSyncProvider
-  | AssetProvider;
+  | AssetProvider
+  | LLMProvider;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { listProviders } from "@/lib/providers/registry";
 import type { ProviderCategory } from "@/lib/providers/types";
 
-const CATEGORIES: ProviderCategory[] = ["image", "video", "voice", "music", "lip-sync", "assets"];
+const CATEGORIES: ProviderCategory[] = ["llm", "image", "video", "voice", "music", "lip-sync", "assets"];
 
 export async function GET() {
   const byCategory = Object.fromEntries(

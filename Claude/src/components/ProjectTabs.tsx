@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { SceneJson } from "@/lib/scene/schema";
 
 type ProjectDetail = {
+  id: string;
   prompt: string;
   visualBible: {
     characters: { id: string; name: string }[];
@@ -10,8 +13,8 @@ type ProjectDetail = {
     props: { id: string; name: string }[];
     clothingItems: { id: string; name: string }[];
   } | null;
-  story: { rawInput: string; refinedText: string | null } | null;
-  scenes: { id: string; index: number }[];
+  story: { rawInput: string; refinedText: string | null; finalizedAt: string | Date | null } | null;
+  scenes: { id: string; index: number; sceneJson: unknown }[];
 };
 
 const TABS = ["Brief", "Visual Bible", "Story", "Scenes", "Timeline", "Captions", "Music"] as const;
@@ -46,19 +49,9 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
         </div>
       )}
 
-      {tab === "Story" && (
-        <div className="text-sm text-neutral-300 whitespace-pre-wrap">
-          {project.story?.refinedText ?? project.story?.rawInput ?? "No story yet."}
-        </div>
-      )}
+      {tab === "Story" && <StoryPanel projectId={project.id} story={project.story} onScenesGenerated={() => setTab("Scenes")} />}
 
-      {tab === "Scenes" && (
-        <div className="text-sm text-neutral-500">
-          {project.scenes.length === 0
-            ? "No scenes yet — finalize the story to generate a scene breakdown."
-            : `${project.scenes.length} scene(s).`}
-        </div>
-      )}
+      {tab === "Scenes" && <ScenesPanel scenes={project.scenes} />}
 
       {(tab === "Timeline" || tab === "Captions" || tab === "Music") && (
         <div className="text-sm text-neutral-500">Coming in a later build phase — see ARCHITECTURE.md.</div>
@@ -80,6 +73,161 @@ function BibleSection({ title, items }: { title: string; items: { id: string; na
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function StoryPanel({
+  projectId,
+  story,
+  onScenesGenerated,
+}: {
+  projectId: string;
+  story: ProjectDetail["story"];
+  onScenesGenerated: () => void;
+}) {
+  const router = useRouter();
+  const [rawInput, setRawInput] = useState(story?.rawInput ?? "");
+  const [saving, setSaving] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function saveRawInput() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawInput }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Failed to save");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function refine() {
+    setRefining(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story/refine`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json())?.error || "Failed to refine story");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to refine story");
+    } finally {
+      setRefining(false);
+    }
+  }
+
+  async function finalize() {
+    setFinalizing(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/story/finalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sceneCount: 5 }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Failed to generate scenes");
+      router.refresh();
+      onScenesGenerated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate scenes");
+    } finally {
+      setFinalizing(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <label className="text-xs text-neutral-500">Raw concept / story</label>
+        <textarea
+          className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm outline-none focus:border-neutral-600 min-h-32"
+          value={rawInput}
+          onChange={(e) => setRawInput(e.target.value)}
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={saveRawInput}
+            disabled={saving}
+            className="text-sm px-3 py-1.5 rounded border border-neutral-700 hover:border-neutral-500 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+          <button
+            onClick={refine}
+            disabled={refining}
+            className="text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
+          >
+            {refining ? "Refining…" : "Refine with AI"}
+          </button>
+        </div>
+      </div>
+
+      {story?.refinedText && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs text-neutral-500">Refined story</label>
+          <div className="text-sm text-neutral-300 whitespace-pre-wrap border border-neutral-800 rounded-lg p-3">
+            {story.refinedText}
+          </div>
+          <button
+            onClick={finalize}
+            disabled={finalizing}
+            className="self-start text-sm px-3 py-1.5 rounded bg-green-600 text-white font-medium disabled:opacity-50"
+          >
+            {finalizing ? "Generating scenes…" : "Finalize Story & Generate Scenes"}
+          </button>
+          {story.finalizedAt && (
+            <p className="text-xs text-neutral-500">Finalized {new Date(story.finalizedAt).toLocaleString()}</p>
+          )}
+        </div>
+      )}
+
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+    </div>
+  );
+}
+
+function ScenesPanel({ scenes }: { scenes: ProjectDetail["scenes"] }) {
+  if (scenes.length === 0) {
+    return (
+      <div className="text-sm text-neutral-500">
+        No scenes yet — finalize the story in the Story tab to generate a scene breakdown.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {scenes.map((s) => {
+        const scene = s.sceneJson as SceneJson;
+        return (
+          <div key={s.id} className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                Scene {scene.index + 1} — {scene.storyBeat}
+              </span>
+              <span className="text-xs text-neutral-500">{scene.duration}s</span>
+            </div>
+            <p className="text-xs text-neutral-400">{scene.purpose}</p>
+            <p className="text-xs text-neutral-500 mt-1">
+              {scene.environment.description} · {scene.environment.lighting}
+            </p>
+            {scene.characters.length > 0 && (
+              <p className="text-xs text-neutral-500">
+                {scene.characters.map((c) => c.action).join(" · ")}
+              </p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

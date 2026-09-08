@@ -6,6 +6,8 @@ import { mockVoiceProvider } from "./voice/mock";
 import { mockMusicProvider } from "./music/mock";
 import { mockLipSyncProvider } from "./lipsync/mock";
 import { mockAssetProvider } from "./assets/mock";
+import { mockLLMProvider } from "./llm/mock";
+import { geminiLLMProvider } from "./llm/gemini";
 
 /**
  * Central provider registry. UI and orchestrator code should never import a
@@ -24,6 +26,8 @@ const providers: AnyProvider[] = [
   mockMusicProvider,
   mockLipSyncProvider,
   mockAssetProvider,
+  geminiLLMProvider,
+  mockLLMProvider,
 ];
 
 export function listProviders(category: ProviderCategory): AnyProvider[] {
