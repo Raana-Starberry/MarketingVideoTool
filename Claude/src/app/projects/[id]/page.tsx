@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { ProjectTabs } from "@/components/ProjectTabs";
+import { StyleSelector } from "@/components/StyleSelector";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +56,10 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
     <div className="max-w-4xl mx-auto px-6 py-10 flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">{project.name}</h1>
-        <p className="text-neutral-400 text-sm mt-1">
-          Style: {project.visualBible?.styleProfile?.renderStyle ?? "unset"}
-        </p>
+        <StyleSelector
+          projectId={project.id}
+          value={project.visualBible?.styleProfile?.renderStyle ?? "cinematic-realistic"}
+        />
       </div>
 
       <ProjectTabs project={{ ...project, references, timelineClips }} />
