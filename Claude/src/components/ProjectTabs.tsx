@@ -44,10 +44,10 @@ type TimelineClipItem = {
   url: string | null;
 };
 
-const TABS = ["Brief", "Visual Bible", "Story", "Scenes", "Timeline", "Captions", "Music"] as const;
+const TABS = ["Story", "Scenes", "Timeline", "Captions", "Music"] as const;
 
 export function ProjectTabs({ project }: { project: ProjectDetail }) {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Brief");
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Story");
 
   return (
     <div className="flex flex-col gap-6">
@@ -65,44 +65,15 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
         ))}
       </div>
 
-      {tab === "Brief" && <div className="text-sm text-neutral-300 whitespace-pre-wrap">{project.prompt}</div>}
-
-      {tab === "Visual Bible" && (
-        <div className="flex flex-col gap-4">
-          <ReferenceUploader projectId={project.id} visualBible={project.visualBible} />
-
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <BibleSection
-              title="Characters"
-              items={project.visualBible?.characters ?? []}
-              references={project.references}
-              entityKey="characterId"
-            />
-            <BibleSection
-              title="Environments"
-              items={project.visualBible?.environments ?? []}
-              references={project.references}
-              entityKey="environmentId"
-            />
-            <BibleSection
-              title="Props"
-              items={project.visualBible?.props ?? []}
-              references={project.references}
-              entityKey="propId"
-            />
-            <BibleSection
-              title="Clothing"
-              items={project.visualBible?.clothingItems ?? []}
-              references={project.references}
-              entityKey="clothingItemId"
-            />
-          </div>
-
-          <GeneralReferences references={project.references} />
-        </div>
+      {tab === "Story" && (
+        <StoryPanel
+          projectId={project.id}
+          story={project.story}
+          visualBible={project.visualBible}
+          references={project.references}
+          onScenesGenerated={() => setTab("Scenes")}
+        />
       )}
-
-      {tab === "Story" && <StoryPanel projectId={project.id} story={project.story} onScenesGenerated={() => setTab("Scenes")} />}
 
       {tab === "Scenes" && <ScenesPanel projectId={project.id} scenes={project.scenes} />}
 
@@ -115,93 +86,40 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
   );
 }
 
-function BibleSection({
-  title,
-  items,
-  references,
-  entityKey,
-}: {
-  title: string;
-  items: { id: string; name: string }[];
-  references: ReferenceItem[];
-  entityKey: "characterId" | "environmentId" | "propId" | "clothingItemId";
-}) {
+function ReferenceGallery({ references }: { references: ReferenceItem[] }) {
   const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function removeReference(referenceId: string) {
-    await fetch(`/api/references/${referenceId}`, { method: "DELETE" });
-    router.refresh();
+    setBusyId(referenceId);
+    try {
+      await fetch(`/api/references/${referenceId}`, { method: "DELETE" });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (references.length === 0) {
+    return <p className="text-xs text-neutral-600">No references uploaded yet.</p>;
   }
 
   return (
-    <div className="border border-neutral-800 rounded-lg p-3">
-      <h3 className="text-neutral-300 font-medium mb-2">{title}</h3>
-      {items.length === 0 ? (
-        <p className="text-neutral-600 text-xs">None yet</p>
-      ) : (
-        <ul className="text-neutral-400 text-xs flex flex-col gap-3">
-          {items.map((item) => {
-            const refs = references.filter((r) => r[entityKey] === item.id);
-            return (
-              <li key={item.id} className="flex flex-col gap-1.5">
-                <span>{item.name}</span>
-                {refs.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {refs.map((r) => (
-                      <div key={r.id} className="relative group">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={r.url} alt={r.label ?? ""} className="w-14 h-14 object-cover rounded border border-neutral-800" />
-                        <button
-                          onClick={() => removeReference(r.id)}
-                          className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[10px] leading-none"
-                          title="Remove"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function GeneralReferences({ references }: { references: ReferenceItem[] }) {
-  const router = useRouter();
-  const general = references.filter(
-    (r) => !r.characterId && !r.environmentId && !r.propId && !r.clothingItemId
-  );
-
-  async function removeReference(referenceId: string) {
-    await fetch(`/api/references/${referenceId}`, { method: "DELETE" });
-    router.refresh();
-  }
-
-  if (general.length === 0) return null;
-
-  return (
-    <div className="border border-neutral-800 rounded-lg p-3">
-      <h3 className="text-neutral-300 font-medium mb-2 text-sm">General references</h3>
-      <div className="flex flex-wrap gap-2">
-        {general.map((r) => (
-          <div key={r.id} className="relative group">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={r.url} alt={r.label ?? ""} className="w-20 h-20 object-cover rounded border border-neutral-800" />
-            <button
-              onClick={() => removeReference(r.id)}
-              className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[10px] leading-none"
-              title="Remove"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {references.map((r) => (
+        <div key={r.id} className="relative group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={r.url} alt={r.label ?? ""} className="w-20 h-20 object-cover rounded border border-neutral-800" />
+          <button
+            disabled={busyId === r.id}
+            onClick={() => removeReference(r.id)}
+            className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-600 text-white text-[10px] leading-none disabled:opacity-50"
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -390,10 +308,14 @@ function ReferenceUploader({
 function StoryPanel({
   projectId,
   story,
+  visualBible,
+  references,
   onScenesGenerated,
 }: {
   projectId: string;
   story: ProjectDetail["story"];
+  visualBible: ProjectDetail["visualBible"];
+  references: ReferenceItem[];
   onScenesGenerated: () => void;
 }) {
   const router = useRouter();
@@ -508,6 +430,11 @@ function StoryPanel({
       )}
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
+
+      <div className="border-t border-neutral-800 pt-4 flex flex-col gap-3">
+        <ReferenceUploader projectId={projectId} visualBible={visualBible} />
+        <ReferenceGallery references={references} />
+      </div>
     </div>
   );
 }
