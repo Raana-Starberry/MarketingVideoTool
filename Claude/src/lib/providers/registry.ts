@@ -1,5 +1,6 @@
 import type { AnyProvider, ProviderCategory } from "./types";
 import { mockImageProvider } from "./image/mock";
+import { geminiImageProvider } from "./image/gemini";
 import { mockVideoProvider } from "./video/mock";
 import { mockVoiceProvider } from "./voice/mock";
 import { mockMusicProvider } from "./music/mock";
@@ -16,6 +17,7 @@ import { mockAssetProvider } from "./assets/mock";
  * (see ARCHITECTURE.md §9). Until then, every category resolves to its mock.
  */
 const providers: AnyProvider[] = [
+  geminiImageProvider,
   mockImageProvider,
   mockVideoProvider,
   mockVoiceProvider,
