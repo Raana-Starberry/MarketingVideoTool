@@ -51,7 +51,7 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
 
       {tab === "Story" && <StoryPanel projectId={project.id} story={project.story} onScenesGenerated={() => setTab("Scenes")} />}
 
-      {tab === "Scenes" && <ScenesPanel scenes={project.scenes} />}
+      {tab === "Scenes" && <ScenesPanel projectId={project.id} scenes={project.scenes} />}
 
       {(tab === "Timeline" || tab === "Captions" || tab === "Music") && (
         <div className="text-sm text-neutral-500">Coming in a later build phase — see ARCHITECTURE.md.</div>
@@ -185,7 +185,7 @@ function StoryPanel({
             {finalizing ? "Generating scenes…" : "Finalize Story & Generate Scenes"}
           </button>
           {story.finalizedAt && (
-            <p className="text-xs text-neutral-500">Finalized {new Date(story.finalizedAt).toLocaleString()}</p>
+            <p className="text-xs text-neutral-500">Finalized {new Date(story.finalizedAt).toLocaleString("en-US")}</p>
           )}
         </div>
       )}
@@ -195,7 +195,7 @@ function StoryPanel({
   );
 }
 
-function ScenesPanel({ scenes }: { scenes: ProjectDetail["scenes"] }) {
+function ScenesPanel({ projectId, scenes }: { projectId: string; scenes: ProjectDetail["scenes"] }) {
   if (scenes.length === 0) {
     return (
       <div className="text-sm text-neutral-500">
@@ -209,7 +209,11 @@ function ScenesPanel({ scenes }: { scenes: ProjectDetail["scenes"] }) {
       {scenes.map((s) => {
         const scene = s.sceneJson as SceneJson;
         return (
-          <div key={s.id} className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-1">
+          <a
+            key={s.id}
+            href={`/projects/${projectId}/scenes/${s.id}`}
+            className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-1 hover:border-neutral-600 transition-colors"
+          >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">
                 Scene {scene.index + 1} — {scene.storyBeat}
@@ -225,7 +229,7 @@ function ScenesPanel({ scenes }: { scenes: ProjectDetail["scenes"] }) {
                 {scene.characters.map((c) => c.action).join(" · ")}
               </p>
             )}
-          </div>
+          </a>
         );
       })}
     </div>

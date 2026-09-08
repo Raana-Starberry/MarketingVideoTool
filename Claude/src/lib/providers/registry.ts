@@ -2,6 +2,7 @@ import type { AnyProvider, ProviderCategory } from "./types";
 import { mockImageProvider } from "./image/mock";
 import { geminiImageProvider } from "./image/gemini";
 import { mockVideoProvider } from "./video/mock";
+import { higgsfieldVideoProvider } from "./video/higgsfield";
 import { mockVoiceProvider } from "./voice/mock";
 import { mockMusicProvider } from "./music/mock";
 import { mockLipSyncProvider } from "./lipsync/mock";
@@ -21,6 +22,7 @@ import { geminiLLMProvider } from "./llm/gemini";
 const providers: AnyProvider[] = [
   geminiImageProvider,
   mockImageProvider,
+  higgsfieldVideoProvider,
   mockVideoProvider,
   mockVoiceProvider,
   mockMusicProvider,

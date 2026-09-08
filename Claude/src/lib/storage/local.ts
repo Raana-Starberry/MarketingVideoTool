@@ -11,7 +11,7 @@ const STORAGE_ROOT = process.env.LOCAL_STORAGE_DIR || path.join(process.cwd(), "
  */
 export const localStorageProvider: StorageProvider = {
   async put(key, data) {
-    const filePath = path.join(STORAGE_ROOT, key);
+    const filePath = path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, data);
     return key;
@@ -22,12 +22,12 @@ export const localStorageProvider: StorageProvider = {
   },
 
   async delete(key) {
-    const filePath = path.join(STORAGE_ROOT, key);
+    const filePath = path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
     await rm(filePath, { force: true });
   },
 };
 
 export async function readLocalAsset(key: string): Promise<Buffer> {
-  const filePath = path.join(STORAGE_ROOT, key);
+  const filePath = path.join(/* turbopackIgnore: true */ STORAGE_ROOT, key);
   return readFile(filePath);
 }
