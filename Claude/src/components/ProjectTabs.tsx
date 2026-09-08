@@ -203,6 +203,12 @@ function ReferenceUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoEntity, setVideoEntity] = useState("");
+  const [frameCount, setFrameCount] = useState(5);
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
   const entityOptions = [
     ...(visualBible?.characters ?? []).map((c) => ({ type: "character", id: c.id, name: `Character: ${c.name}` })),
     ...(visualBible?.environments ?? []).map((e) => ({ type: "environment", id: e.id, name: `Environment: ${e.name}` })),
@@ -238,45 +244,129 @@ function ReferenceUploader({
     }
   }
 
+  async function captureFromVideo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!videoUrl) return;
+    setCapturing(true);
+    setCaptureError(null);
+    try {
+      const [entityType, entityId] = videoEntity ? videoEntity.split(":") : [undefined, undefined];
+      const res = await fetch(`/api/projects/${projectId}/references/from-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: videoUrl,
+          frameCount,
+          ...(entityType && entityId ? { entityType, entityId } : {}),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Failed to capture frames");
+      setVideoUrl("");
+      router.refresh();
+    } catch (err) {
+      setCaptureError(err instanceof Error ? err.message : "Failed to capture frames");
+    } finally {
+      setCapturing(false);
+    }
+  }
+
   return (
-    <form onSubmit={upload} className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-3">
-      <h3 className="text-sm font-medium text-neutral-300">Upload reference</h3>
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        className="text-xs text-neutral-400"
-      />
-      <div className="flex flex-wrap gap-2">
-        <select
-          value={entity}
-          onChange={(e) => setEntity(e.target.value)}
-          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
-        >
-          <option value="">General reference (not linked)</option>
-          {entityOptions.map((o) => (
-            <option key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+    <div className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-5">
+      <form onSubmit={upload} className="flex flex-col gap-3">
+        <h3 className="text-sm font-medium text-neutral-300">Upload reference</h3>
         <input
-          type="text"
-          placeholder="Label (optional)"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs flex-1 min-w-32"
+          type="file"
+          accept="image/*"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="text-xs text-neutral-400"
         />
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={entity}
+            onChange={(e) => setEntity(e.target.value)}
+            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
+          >
+            <option value="">General reference (not linked)</option>
+            {entityOptions.map((o) => (
+              <option key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Label (optional)"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs flex-1 min-w-32"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!file || uploading}
+          className="self-start text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
+        >
+          {uploading ? "Uploading…" : "Upload"}
+        </button>
+        {error && <p className="text-red-400 text-xs">{error}</p>}
+      </form>
+
+      <div className="border-t border-neutral-800 pt-4">
+        <form onSubmit={captureFromVideo} className="flex flex-col gap-3">
+          <div>
+            <h3 className="text-sm font-medium text-neutral-300">Capture from a video link</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Paste a direct video file URL (.mp4/.webm/…) — a few frames are pulled from it automatically as
+              reference stills. YouTube/Twitch watch-page links aren&apos;t supported yet.
+            </p>
+          </div>
+          <input
+            type="url"
+            required
+            placeholder="https://example.com/gameplay-clip.mp4"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
+          />
+          <div className="flex flex-wrap gap-2 items-center">
+            <select
+              value={videoEntity}
+              onChange={(e) => setVideoEntity(e.target.value)}
+              className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
+            >
+              <option value="">General reference (not linked)</option>
+              {entityOptions.map((o) => (
+                <option key={`${o.type}:${o.id}`} value={`${o.type}:${o.id}`}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <label className="text-xs text-neutral-500 flex items-center gap-1.5">
+              Frames
+              <select
+                value={frameCount}
+                onChange={(e) => setFrameCount(Number(e.target.value))}
+                className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-xs"
+              >
+                {[3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={!videoUrl || capturing}
+            className="self-start text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
+          >
+            {capturing ? "Capturing frames…" : "Capture frames"}
+          </button>
+          {captureError && <p className="text-red-400 text-xs">{captureError}</p>}
+        </form>
       </div>
-      <button
-        type="submit"
-        disabled={!file || uploading}
-        className="self-start text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
-      >
-        {uploading ? "Uploading…" : "Upload"}
-      </button>
-      {error && <p className="text-red-400 text-xs">{error}</p>}
-    </form>
+    </div>
   );
 }
 
