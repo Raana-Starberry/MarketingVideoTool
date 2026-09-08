@@ -14,9 +14,11 @@ const STATUS_LABELS: Record<Variation["status"], string> = {
 };
 
 export function SceneGenerationPanel({
+  projectId,
   sceneId,
   initialGenerations,
 }: {
+  projectId: string;
   sceneId: string;
   initialGenerations: Generation[];
 }) {
@@ -25,6 +27,7 @@ export function SceneGenerationPanel({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   async function generate() {
     setGenerating(true);
@@ -56,6 +59,23 @@ export function SceneGenerationPanel({
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function addToTimeline(variationId: string) {
+    setUpdatingId(variationId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/timeline/clips`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variationId }),
+      });
+      if (!res.ok) throw new Error((await res.json())?.error || "Failed to add to timeline");
+      setAddedIds((prev) => new Set(prev).add(variationId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add to timeline");
     } finally {
       setUpdatingId(null);
     }
@@ -124,6 +144,13 @@ export function SceneGenerationPanel({
                           className="text-xs px-2 py-1 rounded border border-neutral-700 hover:border-neutral-500 disabled:opacity-50"
                         >
                           Reject
+                        </button>
+                        <button
+                          disabled={updatingId === v.id}
+                          onClick={() => addToTimeline(v.id)}
+                          className="text-xs px-2 py-1 rounded border border-neutral-700 hover:border-neutral-500 disabled:opacity-50"
+                        >
+                          {addedIds.has(v.id) ? "Added ✓" : "Add to Timeline"}
                         </button>
                       </div>
                     </div>

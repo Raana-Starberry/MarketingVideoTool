@@ -16,10 +16,21 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
       references: { include: { asset: true }, orderBy: { createdAt: "desc" } },
       story: true,
       scenes: { orderBy: { index: "asc" } },
+      timeline: {
+        include: {
+          clips: {
+            orderBy: { order: "asc" },
+            include: { variation: { include: { asset: true } }, asset: true },
+          },
+        },
+      },
     },
   });
 
   if (!project) notFound();
+
+  const resolveAssetUrl = (asset: { url: string | null; storageKey: string } | null | undefined) =>
+    asset ? asset.url ?? `/api/storage/${encodeURIComponent(asset.storageKey)}` : null;
 
   const references = project.references.map((r) => ({
     id: r.id,
@@ -32,6 +43,14 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
     clothingItemId: r.clothingItemId,
   }));
 
+  const timelineClips = (project.timeline?.clips ?? []).map((c) => ({
+    id: c.id,
+    order: c.order,
+    trimStartMs: c.trimStartMs,
+    trimEndMs: c.trimEndMs,
+    url: resolveAssetUrl(c.asset ?? c.variation?.asset),
+  }));
+
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 flex flex-col gap-6">
       <div>
@@ -41,7 +60,7 @@ export default async function ProjectWorkspace({ params }: { params: Promise<{ i
         </p>
       </div>
 
-      <ProjectTabs project={{ ...project, references }} />
+      <ProjectTabs project={{ ...project, references, timelineClips }} />
     </div>
   );
 }
