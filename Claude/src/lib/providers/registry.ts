@@ -4,7 +4,9 @@ import { geminiImageProvider } from "./image/gemini";
 import { mockVideoProvider } from "./video/mock";
 import { higgsfieldVideoProvider } from "./video/higgsfield";
 import { mockVoiceProvider } from "./voice/mock";
+import { elevenLabsVoiceProvider } from "./voice/elevenlabs";
 import { mockMusicProvider } from "./music/mock";
+import { elevenLabsMusicProvider } from "./music/elevenlabs";
 import { mockLipSyncProvider } from "./lipsync/mock";
 import { mockAssetProvider } from "./assets/mock";
 import { mockLLMProvider } from "./llm/mock";
@@ -24,7 +26,9 @@ const providers: AnyProvider[] = [
   mockImageProvider,
   higgsfieldVideoProvider,
   mockVideoProvider,
+  elevenLabsVoiceProvider,
   mockVoiceProvider,
+  elevenLabsMusicProvider,
   mockMusicProvider,
   mockLipSyncProvider,
   mockAssetProvider,
