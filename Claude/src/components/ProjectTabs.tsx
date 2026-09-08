@@ -29,19 +29,6 @@ type ProjectDetail = {
   scenes: { id: string; index: number; sceneJson: unknown }[];
 };
 
-const REFERENCE_KINDS = [
-  "CHARACTER_SHEET",
-  "CHARACTER_IMAGE",
-  "CLOTHING",
-  "ENVIRONMENT",
-  "ART_DIRECTION",
-  "GAME_SCREENSHOT",
-  "PROP",
-  "CAMERA_COMPOSITION",
-  "PREVIOUS_FRAME",
-  "OTHER",
-] as const;
-
 const TABS = ["Brief", "Visual Bible", "Story", "Scenes", "Timeline", "Captions", "Music"] as const;
 
 export function ProjectTabs({ project }: { project: ProjectDetail }) {
@@ -211,7 +198,6 @@ function ReferenceUploader({
 }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [kind, setKind] = useState<(typeof REFERENCE_KINDS)[number]>("CHARACTER_SHEET");
   const [entity, setEntity] = useState("");
   const [label, setLabel] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -233,7 +219,7 @@ function ReferenceUploader({
       const [entityType, entityId] = entity ? entity.split(":") : [undefined, undefined];
       const form = new FormData();
       form.append("file", file);
-      form.append("kind", kind);
+      form.append("kind", "OTHER");
       if (label) form.append("label", label);
       if (entityType && entityId) {
         form.append("entityType", entityType);
@@ -262,17 +248,6 @@ function ReferenceUploader({
         className="text-xs text-neutral-400"
       />
       <div className="flex flex-wrap gap-2">
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value as (typeof REFERENCE_KINDS)[number])}
-          className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1.5 text-xs"
-        >
-          {REFERENCE_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {k.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
         <select
           value={entity}
           onChange={(e) => setEntity(e.target.value)}
