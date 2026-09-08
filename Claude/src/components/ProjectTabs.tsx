@@ -15,6 +15,15 @@ type ProjectDetail = {
   } | null;
   story: { rawInput: string; refinedText: string | null; finalizedAt: string | Date | null } | null;
   scenes: { id: string; index: number; sceneJson: unknown }[];
+  timelineClips: TimelineClipItem[];
+};
+
+type TimelineClipItem = {
+  id: string;
+  order: number;
+  trimStartMs: number;
+  trimEndMs: number | null;
+  url: string | null;
 };
 
 const TABS = ["Brief", "Visual Bible", "Story", "Scenes", "Timeline", "Captions", "Music"] as const;
@@ -53,7 +62,9 @@ export function ProjectTabs({ project }: { project: ProjectDetail }) {
 
       {tab === "Scenes" && <ScenesPanel projectId={project.id} scenes={project.scenes} />}
 
-      {(tab === "Timeline" || tab === "Captions" || tab === "Music") && (
+      {tab === "Timeline" && <TimelinePanel clips={project.timelineClips} />}
+
+      {(tab === "Captions" || tab === "Music") && (
         <div className="text-sm text-neutral-500">Coming in a later build phase — see ARCHITECTURE.md.</div>
       )}
     </div>
@@ -232,6 +243,130 @@ function ScenesPanel({ projectId, scenes }: { projectId: string; scenes: Project
           </a>
         );
       })}
+    </div>
+  );
+}
+
+function TimelinePanel({ clips }: { clips: TimelineClipItem[] }) {
+  const router = useRouter();
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function move(clipId: string, direction: "up" | "down") {
+    setBusyId(clipId);
+    try {
+      await fetch(`/api/timeline-clips/${clipId}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remove(clipId: string) {
+    setBusyId(clipId);
+    try {
+      await fetch(`/api/timeline-clips/${clipId}`, { method: "DELETE" });
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function updateTrim(clipId: string, trimStartMs: number, trimEndMs: number | null) {
+    await fetch(`/api/timeline-clips/${clipId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trimStartMs, trimEndMs }),
+    });
+    router.refresh();
+  }
+
+  if (clips.length === 0) {
+    return (
+      <div className="text-sm text-neutral-500">
+        No clips yet — open a scene and use &quot;Add to Timeline&quot; on a generated image to start building
+        the sequence.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-1 overflow-x-auto pb-2">
+        {clips.map((clip) => (
+          <div key={clip.id} className="flex-shrink-0 w-16 h-16">
+            {clip.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={clip.url} alt="" className="w-full h-full object-cover rounded border border-neutral-700" />
+            ) : (
+              <div className="w-full h-full rounded border border-neutral-800 bg-neutral-900" />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {clips.map((clip, i) => (
+          <div key={clip.id} className="border border-neutral-800 rounded-lg p-3 flex items-center gap-3">
+            <span className="text-xs text-neutral-500 w-6">#{i + 1}</span>
+            {clip.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={clip.url} alt="" className="w-12 h-12 object-cover rounded border border-neutral-800" />
+            ) : (
+              <div className="w-12 h-12 rounded border border-neutral-800 bg-neutral-900" />
+            )}
+            <div className="flex items-center gap-2 text-xs text-neutral-500">
+              <label className="flex items-center gap-1">
+                Trim start (ms)
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={clip.trimStartMs}
+                  onBlur={(e) => updateTrim(clip.id, Number(e.target.value), clip.trimEndMs)}
+                  className="w-20 bg-neutral-900 border border-neutral-800 rounded px-1.5 py-1"
+                />
+              </label>
+              <label className="flex items-center gap-1">
+                Trim end (ms)
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={clip.trimEndMs ?? ""}
+                  placeholder="none"
+                  onBlur={(e) => updateTrim(clip.id, clip.trimStartMs, e.target.value ? Number(e.target.value) : null)}
+                  className="w-20 bg-neutral-900 border border-neutral-800 rounded px-1.5 py-1"
+                />
+              </label>
+            </div>
+            <div className="flex gap-1 ml-auto">
+              <button
+                disabled={busyId === clip.id || i === 0}
+                onClick={() => move(clip.id, "up")}
+                className="text-xs px-2 py-1 rounded border border-neutral-700 hover:border-neutral-500 disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                disabled={busyId === clip.id || i === clips.length - 1}
+                onClick={() => move(clip.id, "down")}
+                className="text-xs px-2 py-1 rounded border border-neutral-700 hover:border-neutral-500 disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                disabled={busyId === clip.id}
+                onClick={() => remove(clip.id)}
+                className="text-xs px-2 py-1 rounded border border-red-900 text-red-400 hover:border-red-700 disabled:opacity-30"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

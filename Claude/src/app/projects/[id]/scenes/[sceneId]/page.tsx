@@ -62,7 +62,7 @@ export default async function SceneDetailPage({
         )}
       </div>
 
-      <SceneGenerationPanel sceneId={sceneId} initialGenerations={generationsForClient} />
+      <SceneGenerationPanel projectId={projectId} sceneId={sceneId} initialGenerations={generationsForClient} />
     </div>
   );
 }
