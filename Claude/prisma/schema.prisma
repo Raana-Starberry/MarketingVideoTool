@@ -152,6 +152,7 @@ model Story {
   projectId     String   @unique
   rawInput      String
   refinedText   String?
+  beatSheet     Json?
   finalizedAt   DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

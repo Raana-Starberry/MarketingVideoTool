@@ -273,13 +273,20 @@ server-side.
 ## 7. Generation Workflow
 
 ```
-Concept → Project → Story → Scene Breakdown → Scene JSON
+Concept → Project → Story → Professional Story Review (beat sheet) → Scene Breakdown → Scene JSON
    → Image Generation (per scene, N variations)
    → Video Generation (image-to-video from selected image, provider-capability-aware)
    → Review Variations → Select/Favorite
    → Timeline assembly → Captions → Music
    → Final Export (ffmpeg render of selected clips + audio + captions)
 ```
+
+**Professional Story Review**: before scene breakdown, `refineStory()` (src/lib/scene/planner.ts) runs
+the concept through a fixed 6-beat short-form trailer structure — Hook, Setup, Inciting Incident,
+Rising Action, Climax, Resolution (src/lib/scene/story-schema.ts) — rather than a generic rewrite. The
+result (`Story.beatSheet`) is shown in the Story tab as a structured review, and scene breakdown
+allocates each generated scene to one beat in sequence (`allocateBeats()`), so the story's dramatic
+shape — not just its prose — drives what gets shot.
 
 Every generation call is created as a `Generation` + wrapped in a `GenerationJob` (§22) so the UI never
 blocks on a long-running request. The Orchestrator is the only thing that talks to providers — it:

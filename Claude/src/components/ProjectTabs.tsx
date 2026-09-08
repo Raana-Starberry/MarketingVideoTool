@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SceneJson } from "@/lib/scene/schema";
+import { BEAT_ORDER, BEAT_LABELS, type BeatSheet } from "@/lib/scene/story-schema";
 
 type ProjectDetail = {
   id: string;
@@ -13,7 +14,12 @@ type ProjectDetail = {
     props: { id: string; name: string }[];
     clothingItems: { id: string; name: string }[];
   } | null;
-  story: { rawInput: string; refinedText: string | null; finalizedAt: string | Date | null } | null;
+  story: {
+    rawInput: string;
+    refinedText: string | null;
+    beatSheet: unknown;
+    finalizedAt: string | Date | null;
+  } | null;
   scenes: { id: string; index: number; sceneJson: unknown }[];
 };
 
@@ -171,9 +177,16 @@ function StoryPanel({
         </div>
       </div>
 
+      {story?.beatSheet != null && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs text-neutral-500">Professional story review</label>
+          <BeatSheetView beatSheet={story.beatSheet as BeatSheet} />
+        </div>
+      )}
+
       {story?.refinedText && (
         <div className="flex flex-col gap-2">
-          <label className="text-xs text-neutral-500">Refined story</label>
+          <label className="text-xs text-neutral-500">Refined narrative</label>
           <div className="text-sm text-neutral-300 whitespace-pre-wrap border border-neutral-800 rounded-lg p-3">
             {story.refinedText}
           </div>
@@ -191,6 +204,26 @@ function StoryPanel({
       )}
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
+    </div>
+  );
+}
+
+function BeatSheetView({ beatSheet }: { beatSheet: BeatSheet }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        {BEAT_ORDER.map((key) => (
+          <div key={key} className="border border-neutral-800 rounded-lg p-3">
+            <div className="text-xs text-neutral-500 mb-1">{BEAT_LABELS[key]}</div>
+            <div className="text-sm text-neutral-300">{beatSheet[key]}</div>
+          </div>
+        ))}
+      </div>
+      {beatSheet.craftNotes && (
+        <div className="text-xs text-neutral-500 italic border-t border-neutral-800 pt-2">
+          {beatSheet.craftNotes}
+        </div>
+      )}
     </div>
   );
 }
