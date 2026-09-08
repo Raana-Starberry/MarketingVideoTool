@@ -1,0 +1,376 @@
+// Prisma schema for the AI Marketing Creative Video Generator.
+// See ARCHITECTURE.md §2 for the entity-relationship rationale.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Project
+// ---------------------------------------------------------------------------
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  prompt      String // original creative concept as typed by the user
+  visualStyle String? // e.g. "cinematic-realistic", "stylized-3d" — see StyleProfile for full detail
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  visualBible    VisualBible?
+  story          Story?
+  scenes         Scene[]
+  references     Reference[]
+  generations    Generation[]
+  generationJobs GenerationJob[]
+  audioTracks    AudioTrack[]
+  timeline       Timeline?
+  providerConfigs ProjectProviderConfig[]
+}
+
+// ---------------------------------------------------------------------------
+// Visual Bible — the project's persistent consistency profile
+// ---------------------------------------------------------------------------
+
+model VisualBible {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  styleProfile StyleProfile?
+  characters   Character[]
+  clothingItems ClothingItem[]
+  environments Environment[]
+  props        Prop[]
+}
+
+model StyleProfile {
+  id            String      @id @default(uuid())
+  visualBible   VisualBible @relation(fields: [visualBibleId], references: [id], onDelete: Cascade)
+  visualBibleId String      @unique
+  renderStyle   String // "realistic" | "cinematic-realistic" | "3d-animation" | "stylized-3d" | "cartoon" | "game-cinematic" | "mobile-ad" | "custom"
+  colorPalette  String[] // hex values
+  lightingDirection String?
+  referenceNotes String?
+}
+
+model Character {
+  id            String      @id @default(uuid())
+  visualBible   VisualBible @relation(fields: [visualBibleId], references: [id], onDelete: Cascade)
+  visualBibleId String
+  name          String
+  description   String // face, body, hair, proportions, etc.
+  createdAt     DateTime    @default(now())
+
+  references Reference[]
+}
+
+model ClothingItem {
+  id            String      @id @default(uuid())
+  visualBible   VisualBible @relation(fields: [visualBibleId], references: [id], onDelete: Cascade)
+  visualBibleId String
+  name          String
+  description   String
+  createdAt     DateTime    @default(now())
+
+  references Reference[]
+}
+
+model Environment {
+  id            String      @id @default(uuid())
+  visualBible   VisualBible @relation(fields: [visualBibleId], references: [id], onDelete: Cascade)
+  visualBibleId String
+  name          String
+  description   String
+  createdAt     DateTime    @default(now())
+
+  references Reference[]
+}
+
+model Prop {
+  id            String      @id @default(uuid())
+  visualBible   VisualBible @relation(fields: [visualBibleId], references: [id], onDelete: Cascade)
+  visualBibleId String
+  name          String
+  description   String
+  createdAt     DateTime    @default(now())
+
+  references Reference[]
+}
+
+// ---------------------------------------------------------------------------
+// References (uploads)
+// ---------------------------------------------------------------------------
+
+enum ReferenceKind {
+  CHARACTER_SHEET
+  CHARACTER_IMAGE
+  CLOTHING
+  ENVIRONMENT
+  ART_DIRECTION
+  GAME_SCREENSHOT
+  PROP
+  CAMERA_COMPOSITION
+  PREVIOUS_FRAME
+  OTHER
+}
+
+model Reference {
+  id        String        @id @default(uuid())
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  kind      ReferenceKind
+  asset     Asset         @relation(fields: [assetId], references: [id])
+  assetId   String
+  label     String?
+  createdAt DateTime      @default(now())
+
+  character     Character?    @relation(fields: [characterId], references: [id])
+  characterId   String?
+  clothingItem  ClothingItem? @relation(fields: [clothingItemId], references: [id])
+  clothingItemId String?
+  environment   Environment?  @relation(fields: [environmentId], references: [id])
+  environmentId String?
+  prop          Prop?         @relation(fields: [propId], references: [id])
+  propId        String?
+}
+
+// ---------------------------------------------------------------------------
+// Story
+// ---------------------------------------------------------------------------
+
+model Story {
+  id            String   @id @default(uuid())
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String   @unique
+  rawInput      String
+  refinedText   String?
+  finalizedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Scenes — sceneJson is the source of truth, validated against the Zod
+// schema in src/lib/scene/schema.ts before it is ever written here.
+// ---------------------------------------------------------------------------
+
+model Scene {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  index     Int
+  sceneJson Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  generations Generation[]
+
+  @@unique([projectId, index])
+}
+
+// ---------------------------------------------------------------------------
+// Generations, variations, jobs
+// ---------------------------------------------------------------------------
+
+enum GenerationType {
+  IMAGE
+  VIDEO
+  VOICE
+  MUSIC
+  LIP_SYNC
+}
+
+enum GenerationStatus {
+  DRAFT
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model Generation {
+  id         String           @id @default(uuid())
+  project    Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+  scene      Scene?           @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  sceneId    String?
+  type       GenerationType
+  providerId String
+  model      String
+  status     GenerationStatus @default(DRAFT)
+  request    Json // the exact provider request payload built by the orchestrator
+  costEstimate Float?
+  costActual   Float?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  variations GenerationVariation[]
+  jobs       GenerationJob[]
+}
+
+enum VariationStatus {
+  PENDING
+  SELECTED
+  FAVORITE
+  REJECTED
+}
+
+model GenerationVariation {
+  id           String          @id @default(uuid())
+  generation   Generation      @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  generationId String
+  asset        Asset           @relation(fields: [assetId], references: [id])
+  assetId      String
+  status       VariationStatus @default(PENDING)
+  createdAt    DateTime        @default(now())
+
+  timelineClips TimelineClip[]
+}
+
+enum JobStatus {
+  QUEUED
+  PREPARING
+  GENERATING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model GenerationJob {
+  id           String     @id @default(uuid())
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId    String
+  generation   Generation @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  generationId String
+  status       JobStatus  @default(QUEUED)
+  progress     Int        @default(0)
+  result       Json?
+  error        String?
+  createdAt    DateTime   @default(now())
+  startedAt    DateTime?
+  completedAt  DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Assets — every stored file (image, video, audio) generated or uploaded
+// ---------------------------------------------------------------------------
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+model Asset {
+  id         String    @id @default(uuid())
+  type       AssetType
+  storageKey String // path/key resolved by the active StorageProvider
+  url        String? // resolved public/signed URL, may be regenerated
+  width      Int?
+  height     Int?
+  durationMs Int?
+  mimeType   String?
+  checksum   String?
+  createdAt  DateTime  @default(now())
+
+  references     Reference[]
+  variations     GenerationVariation[]
+  timelineClips  TimelineClip[]
+}
+
+// ---------------------------------------------------------------------------
+// Timeline / export
+// ---------------------------------------------------------------------------
+
+model Timeline {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clips         TimelineClip[]
+  captionTracks CaptionTrack[]
+  exports       Export[]
+}
+
+model TimelineClip {
+  id          String               @id @default(uuid())
+  timeline    Timeline             @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  timelineId  String
+  order       Int
+  variation   GenerationVariation? @relation(fields: [variationId], references: [id])
+  variationId String?
+  asset       Asset?               @relation(fields: [assetId], references: [id])
+  assetId     String?
+  trimStartMs Int                  @default(0)
+  trimEndMs   Int?
+  transitionOut String? // "cut" | "match-cut" | "dissolve" | ...
+}
+
+model AudioTrack {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  kind      String // "music" | "dialogue" | "voiceover" | "sfx"
+  source    String // "manual" | "generated"
+  assetId   String?
+  providerId String?
+  request   Json?
+  createdAt DateTime @default(now())
+}
+
+model CaptionTrack {
+  id          String            @id @default(uuid())
+  timeline    Timeline          @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  timelineId  String
+  enabled     Boolean           @default(true)
+  styleConfig Json // font, size, color, background, highlight, position...
+  segments    CaptionSegment[]
+}
+
+model CaptionSegment {
+  id             String       @id @default(uuid())
+  captionTrack   CaptionTrack @relation(fields: [captionTrackId], references: [id], onDelete: Cascade)
+  captionTrackId String
+  text           String
+  startMs        Int
+  endMs          Int
+  styleOverride  Json?
+}
+
+model Export {
+  id         String   @id @default(uuid())
+  timeline   Timeline @relation(fields: [timelineId], references: [id], onDelete: Cascade)
+  timelineId String
+  storageKey String?
+  status     String // "queued" | "rendering" | "completed" | "failed"
+  createdAt  DateTime @default(now())
+  completedAt DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// Provider configuration — NEVER stores secrets, only enablement/defaults.
+// Secrets live exclusively in server-side environment variables.
+// ---------------------------------------------------------------------------
+
+model ProjectProviderConfig {
+  id         String   @id @default(uuid())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+  category   String // "image" | "video" | "voice" | "music" | "assets" | "lip-sync"
+  providerId String
+  isDefault  Boolean  @default(false)
+
+  @@unique([projectId, category, providerId])
+}
