@@ -33,6 +33,7 @@ export async function POST(request: Request) {
         },
       },
       story: { create: { rawInput: parsed.data.prompt } },
+      timeline: { create: {} },
     },
   });
 

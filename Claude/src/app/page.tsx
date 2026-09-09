@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { NewProjectForm } from "@/components/NewProjectForm";
+import { ProjectCard } from "@/components/ProjectCard";
 
 export const dynamic = "force-dynamic";
 
@@ -23,16 +23,7 @@ export default async function ProjectsDashboard() {
         {projects.length === 0 ? (
           <p className="text-neutral-500 text-sm">No projects yet — create one above.</p>
         ) : (
-          projects.map((p) => (
-            <Link
-              key={p.id}
-              href={`/projects/${p.id}`}
-              className="border border-neutral-800 rounded-lg p-4 hover:border-neutral-600 transition-colors"
-            >
-              <div className="font-medium">{p.name}</div>
-              <div className="text-sm text-neutral-400 line-clamp-2 mt-1">{p.prompt}</div>
-            </Link>
-          ))
+          projects.map((p) => <ProjectCard key={p.id} project={p} />)
         )}
       </div>
     </div>

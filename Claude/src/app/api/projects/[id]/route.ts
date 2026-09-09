@@ -16,3 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
   return NextResponse.json({ project });
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await prisma.project.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

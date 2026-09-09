@@ -15,8 +15,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const visualStyle = project.visualBible?.styleProfile?.renderStyle ?? "cinematic-realistic";
-    const refinedText = await refineStory(project.story.rawInput, visualStyle);
-    const story = await prisma.story.update({ where: { projectId: id }, data: { refinedText } });
+    const { narrative, beatSheet } = await refineStory(project.story.rawInput, visualStyle);
+    const story = await prisma.story.update({
+      where: { projectId: id },
+      data: { refinedText: narrative, beatSheet },
+    });
     return NextResponse.json({ story });
   } catch (e) {
     return NextResponse.json(
