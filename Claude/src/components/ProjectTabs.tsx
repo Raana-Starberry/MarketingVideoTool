@@ -132,10 +132,11 @@ function ReferenceUploader({
   visualBible: ProjectDetail["visualBible"];
 }) {
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [entity, setEntity] = useState("");
   const [label, setLabel] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [videoUrl, setVideoUrl] = useState("");
@@ -153,29 +154,36 @@ function ReferenceUploader({
 
   async function upload(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return;
+    if (files.length === 0) return;
     setUploading(true);
     setError(null);
+    setUploadProgress({ done: 0, total: files.length });
     try {
       const [entityType, entityId] = entity ? entity.split(":") : [undefined, undefined];
-      const form = new FormData();
-      form.append("file", file);
-      form.append("kind", "OTHER");
-      if (label) form.append("label", label);
-      if (entityType && entityId) {
-        form.append("entityType", entityType);
-        form.append("entityId", entityId);
+
+      for (let i = 0; i < files.length; i++) {
+        const form = new FormData();
+        form.append("file", files[i]);
+        form.append("kind", "OTHER");
+        if (label) form.append("label", files.length > 1 ? `${label} (${i + 1})` : label);
+        if (entityType && entityId) {
+          form.append("entityType", entityType);
+          form.append("entityId", entityId);
+        }
+
+        const res = await fetch(`/api/projects/${projectId}/references`, { method: "POST", body: form });
+        if (!res.ok) throw new Error((await res.json())?.error || `Upload failed on file ${i + 1} of ${files.length}`);
+        setUploadProgress({ done: i + 1, total: files.length });
       }
 
-      const res = await fetch(`/api/projects/${projectId}/references`, { method: "POST", body: form });
-      if (!res.ok) throw new Error((await res.json())?.error || "Upload failed");
-      setFile(null);
+      setFiles([]);
       setLabel("");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -208,13 +216,20 @@ function ReferenceUploader({
   return (
     <div className="border border-neutral-800 rounded-lg p-4 flex flex-col gap-5">
       <form onSubmit={upload} className="flex flex-col gap-3">
-        <h3 className="text-sm font-medium text-neutral-300">Upload reference</h3>
+        <h3 className="text-sm font-medium text-neutral-300">Upload references</h3>
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          multiple
+          onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])}
           className="text-xs text-neutral-400"
         />
+        {files.length > 0 && (
+          <p className="text-xs text-neutral-500">
+            {files.length} file{files.length === 1 ? "" : "s"} selected
+            {uploadProgress ? ` — uploading ${uploadProgress.done}/${uploadProgress.total}` : ""}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <select
             value={entity}
@@ -238,10 +253,14 @@ function ReferenceUploader({
         </div>
         <button
           type="submit"
-          disabled={!file || uploading}
+          disabled={files.length === 0 || uploading}
           className="self-start text-sm px-3 py-1.5 rounded bg-neutral-100 text-neutral-900 font-medium disabled:opacity-50"
         >
-          {uploading ? "Uploading…" : "Upload"}
+          {uploading
+            ? `Uploading ${uploadProgress?.done ?? 0}/${uploadProgress?.total ?? files.length}…`
+            : files.length > 1
+              ? `Upload ${files.length} files`
+              : "Upload"}
         </button>
         {error && <p className="text-red-400 text-xs">{error}</p>}
       </form>
